@@ -861,12 +861,10 @@ void SciTEBase::New() {
 	if ((buffers.length > 1) ||
 			(buffers.Current() != 0) ||
 			(buffers.buffers[0].isDirty) ||
-			(!buffers.buffers[0].file.IsUntitled())||
-		    (buffers.buffers[0].isRestoredFromSession) ) {
+			(!buffers.buffers[0].file.IsUntitled())) {
 		if (buffers.size() == buffers.length) {
 			Close(false, false, true);
 		}
-	
 		buffers.SetCurrent(buffers.Add());
 	}
 
@@ -1264,13 +1262,6 @@ bool SciTEBase::AddFileToBuffer(const BufferState &bufferState) {
 					DisplayAround(buffers.buffers[iBuffer].file);
 					wEditor.ScrollCaret();
 				}
-			}
-
-			if (bufferState.file.AsUTF8().find("BUFFER_UNTITLED") != std::string::npos) {
-				//buffers.buffers[iBuffer].file.Set(FilePath());
-				filePath.Set(FilePath());
-				//UpdateBuffersCurrent();
-				buffers.buffers[iBuffer].isRestoredFromSession = true; 
 			}
 		}
 	}

@@ -96,7 +96,6 @@ class Buffer {
 public:
 	RecentFile file;
 	void *doc;
-	bool isRestoredFromSession;
 	bool isDirty;
 	bool isReadOnly;
 	bool failedSave;

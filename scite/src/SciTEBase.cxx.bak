@@ -4679,18 +4679,14 @@ bool SciTEBase::ProcessCommandLine(const GUI::gui_string &args, int phase) {
 			else
 				evaluate = true;
 
-			//if (!buffers.initialised) {
-			//	InitialiseBuffers();
-			//	if (props.GetInt("save.recent"))
-			//		RestoreRecentMenu();
-			//}
-
-			if (!PreOpenCheck(arg)) {
-				
-				//Open(arg, static_cast<OpenFlags>(ofQuiet | ofSynchronous));
-				toBeOpenFiles.push_back(GUI::gui_string(arg));
+			if (!buffers.initialised) {
+				InitialiseBuffers();
+				if (props.GetInt("save.recent"))
+					RestoreRecentMenu();
 			}
-				
+
+			if (!PreOpenCheck(arg))
+				Open(arg, static_cast<OpenFlags>(ofQuiet|ofSynchronous));
 		}
 	}
 	if (phase == 1) {
@@ -4703,21 +4699,10 @@ bool SciTEBase::ProcessCommandLine(const GUI::gui_string &args, int phase) {
 			if (props.GetInt("buffers") && props.GetInt("save.session"))
 				RestoreSession();
 		}
-
-
-		
-		for(int i =0; i< toBeOpenFiles.size(); i++){
-			Open(toBeOpenFiles[i].c_str(), static_cast<OpenFlags>(ofQuiet | ofSynchronous));
-		}
-		toBeOpenFiles.clear();
-
 		// No open file after session load so create empty document.
 		if (filePath.IsUntitled() && buffers.length == 1 && !buffers.buffers[0].isDirty) {
-			if ((filePath.AsUTF8().length() > 0)) {
-				Open(FilePath());
-			}
+			Open(FilePath());
 		}
-
 	}
 	return performPrint;
 }
