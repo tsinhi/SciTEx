@@ -380,6 +380,13 @@ void SciTEBase::DefineMarker(SA::MarkerOutline marker, SA::MarkerSymbol markerTy
 	wEditor.MarkerSetFore(markerNumber, fore);
 	wEditor.MarkerSetBack(markerNumber, back);
 	wEditor.MarkerSetBackSelected(markerNumber, backSelected);
+	wOutput.MarkerDefine(markerNumber, markerType);
+	wOutput.MarkerSetFore(markerNumber, fore);
+	wOutput.MarkerSetBack(markerNumber, back);
+	wOutput.MarkerSetBackSelected(markerNumber, backSelected);
+
+
+	
 }
 
 void SciTEBase::ReadAPI(const std::string &fileNameForExtension) {
@@ -691,6 +698,8 @@ void SciTEBase::ReadProperties() {
 	lexLanguage = wEditor.Lexer();
 
 	wOutput.SetLexer(SCLEX_ERRORLIST);
+	wOutput.SetLexerLanguage("errorlist");
+
 
 	const std::string kw0 = props.GetNewExpandString("keywords.", fileNameForExtension.c_str());
 	wEditor.SetKeyWords(0, kw0.c_str());
@@ -1177,11 +1186,15 @@ void SciTEBase::ReadProperties() {
 	SetToolsMenu();
 
 	wEditor.SetFoldFlags(static_cast<SA::FoldFlag>(props.GetInt("fold.flags")));
+	wOutput.SetFoldFlags(static_cast<SA::FoldFlag>(props.GetInt("fold.flags")));
+
 
 	// To put the folder markers in the line number region
 	//wEditor.SetMarginMaskN(0, SC_MASK_FOLDERS);
 
 	wEditor.SetModEventMask(SA::ModificationFlags::ChangeFold);
+	wOutput.SetModEventMask(SA::ModificationFlags::ChangeFold);
+
 
 	if (0==props.GetInt("undo.redo.lazy")) {
 		// Trap for insert/delete notifications (also fired by undo
@@ -1193,6 +1206,7 @@ void SciTEBase::ReadProperties() {
 				SA::ModificationFlags::DeleteText |
 				SA::ModificationFlags::LastStepInUndoRedo;
 		wEditor.SetModEventMask(flags);
+		//wOutput.SetModEventMask(flags);
 
 		// LastStepInUndoRedo is probably not needed in the mask; it
 		// doesn't seem to fire as an event of its own; just modifies the
@@ -1201,14 +1215,19 @@ void SciTEBase::ReadProperties() {
 
 	// Create a margin column for the folding symbols
 	wEditor.SetMarginTypeN(2, SA::MarginType::Symbol);
+	wOutput.SetMarginTypeN(2, SA::MarginType::Symbol);
 
 	foldMarginWidth = props.GetInt("fold.margin.width");
 	if (foldMarginWidth == 0)
 		foldMarginWidth = foldMarginWidthDefault;
 	wEditor.SetMarginWidthN(2, foldMargin ? foldMarginWidth : 0);
+	wOutput.SetMarginWidthN(2, foldMargin ? foldMarginWidth : 0);
 
 	wEditor.SetMarginMaskN(2, SA::MaskFolders);
 	wEditor.SetMarginSensitiveN(2, true);
+	wOutput.SetMarginMaskN(2, SA::MaskFolders);
+	wOutput.SetMarginSensitiveN(2, true);
+
 
 	// Define foreground (outline) and background (fill) color of folds
 	const int foldSymbols = props.GetInt("fold.symbols");
@@ -1272,6 +1291,8 @@ void SciTEBase::ReadProperties() {
 			     colourFoldFore, colourFoldBack, colourFoldBlockHighlight);
 		// The highlight is disabled for arrow.
 		wEditor.MarkerEnableHighlight(false);
+		wOutput.MarkerEnableHighlight(false);
+
 		break;
 	case 1:
 		// Plus for contracted folders, minus for expanded
@@ -1291,6 +1312,8 @@ void SciTEBase::ReadProperties() {
 			     colourFoldFore, colourFoldBack, colourFoldBlockHighlight);
 		// The highlight is disabled for plus/minus.
 		wEditor.MarkerEnableHighlight(false);
+		wOutput.MarkerEnableHighlight(false);
+
 		break;
 	case 2:
 		// Like a flattened tree control using circular headers and curved joins
@@ -1309,6 +1332,8 @@ void SciTEBase::ReadProperties() {
 		DefineMarker(SA::MarkerOutline::FolderMidTail, SA::MarkerSymbol::TCornerCurve,
 			     colourFoldBack, colourFoldFore, colourFoldBlockHighlight);
 		wEditor.MarkerEnableHighlight(isHighlightEnabled);
+		wOutput.MarkerEnableHighlight(isHighlightEnabled);
+
 		break;
 	case 3:
 		// Like a flattened tree control using square headers
@@ -1327,6 +1352,8 @@ void SciTEBase::ReadProperties() {
 		DefineMarker(SA::MarkerOutline::FolderMidTail, SA::MarkerSymbol::TCorner,
 			     colourFoldBack, colourFoldFore, colourFoldBlockHighlight);
 		wEditor.MarkerEnableHighlight(isHighlightEnabled);
+		wOutput.MarkerEnableHighlight(isHighlightEnabled);
+
 		break;
 	}
 
@@ -1336,15 +1363,32 @@ void SciTEBase::ReadProperties() {
 			      ColourOfProperty(props, "bookmark.back", ColourRGB(0xe2, 0x40, 0x40)));
 	wEditor.MarkerSetAlpha(markerBookmark,
 			       static_cast<SA::Alpha>(props.GetInt("bookmark.alpha", static_cast<int>(SA::Alpha::NoAlpha))));
+	wOutput.MarkerSetFore(markerBookmark,
+		ColourOfProperty(props, "bookmark.fore", ColourRGB(0xbe, 0, 0)));
+	wOutput.MarkerSetBack(markerBookmark,
+		ColourOfProperty(props, "bookmark.back", ColourRGB(0xe2, 0x40, 0x40)));
+	wOutput.MarkerSetAlpha(markerBookmark,
+		static_cast<SA::Alpha>(props.GetInt("bookmark.alpha", static_cast<int>(SA::Alpha::NoAlpha))));
+
+
+
 	const std::string bookMarkXPM = props.GetString("bookmark.pixmap");
 	if (bookMarkXPM.length()) {
 		wEditor.MarkerDefinePixmap(markerBookmark, bookMarkXPM.c_str());
+		wOutput.MarkerDefinePixmap(markerBookmark, bookMarkXPM.c_str());
+
+
 	} else if (props.GetString("bookmark.fore").length()) {
 		wEditor.MarkerDefine(markerBookmark, static_cast<SA::MarkerSymbol>(
 					     props.GetInt("bookmark.symbol", static_cast<int>(SA::MarkerSymbol::Bookmark))));
+
+		wOutput.MarkerDefine(markerBookmark, static_cast<SA::MarkerSymbol>(
+			props.GetInt("bookmark.symbol", static_cast<int>(SA::MarkerSymbol::Bookmark))));
 	} else {
 		// No bookmark.fore setting so display default pixmap.
 		wEditor.MarkerDefinePixmap(markerBookmark, reinterpret_cast<const char *>(bookmarkBluegem));
+		wOutput.MarkerDefinePixmap(markerBookmark, reinterpret_cast<const char*>(bookmarkBluegem));
+
 	}
 
 	wEditor.SetScrollWidth(props.GetInt("horizontal.scroll.width", 2000));

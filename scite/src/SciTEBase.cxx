@@ -1261,6 +1261,104 @@ intptr_t SciTEBase::ReplaceInBuffers() {
 	return replacements;
 }
 
+
+intptr_t SciTEBase::FindAllBuffers() {
+	
+	// find all buffers
+	const int currentBuffer = buffers.Current();
+	intptr_t replacements = 0;
+	for (int i = 0; i < buffers.length; i++) {
+		SetDocumentAt(i);
+		replacements += DoReplaceAll(false);
+		if (i == 0 && replacements < 0) {
+			FindMessageBox(
+				"Find string must not be empty for 'Replace in Buffers' command.");
+			break;
+		}
+	}
+	SetDocumentAt(currentBuffer);
+	
+	OutputAppendString("find all buffers\n");
+	SetOutputVisibility(true);
+	return 0;
+}
+
+
+
+intptr_t SciTEBase::FindCurrentBuffer() {
+		
+	if (findWhat.length() == 0) {
+		Find();
+		return -1;
+	}
+
+	
+	
+
+	const std::string findTarget = UnSlashAsNeeded(EncodeString(findWhat), unSlash, regExp);
+	if (findTarget.length() == 0) {
+		return -1;
+	}
+
+	OutputAppendString("search for ....\n");
+	OutputAppendString("  File: Untitled 0\n");
+	OutputAppendString("    LINE:2:1: finded 0\n");
+
+	FilePath currentPath = CurrentBuffer()->file.BaseName();
+	Buffer *buff =  CurrentBuffer();
+	
+	
+
+#if 0
+
+	SA::Range rangeSearch = wEditor.SelectionRange();
+	rangeSearch.start = 0;
+	rangeSearch.end = LengthDocument();
+	wEditor.SetSearchFlags(SearchFlags(regExp));
+	SA::Position posFind = FindInTarget(findTarget, rangeSearch);
+	if ((posFind >= 0) && (posFind <= rangeSearch.end)) {
+		SA::Position lastMatch = posFind;
+		intptr_t findnum = 0;
+		std::string os(":");
+
+		// find loop
+		while (posFind >= 0) {
+			
+			findnum++;
+			Scintilla::API::Line findLine = wEditor.LineFromPosition(posFind);
+			os.append(StdStringFromInteger(findLine));
+			os.append(":1: finded");
+			os.append("\n");
+			OutputAppendString(os.c_str());
+			os.clear();
+
+
+			const SA::Position lenTarget = wEditor.TargetEnd() - wEditor.TargetStart();
+			lastMatch = posFind+1;
+			
+			if (lenTarget <= 0) {
+				lastMatch = wEditor.PositionAfter(lastMatch);
+			}
+			if (lastMatch >= rangeSearch.end) {
+				// Run off the end of the document/selection with an empty match
+				posFind = -1;
+			}
+			else {
+				posFind = FindInTarget(findTarget, SA::Range(lastMatch, rangeSearch.end));
+			}
+		
+		}
+		
+
+	}
+	
+#endif
+
+	SetOutputVisibility(true);
+	//SetDocumentAt(1);
+	return 0;
+}
+
 void SciTEBase::UIClosed() {
 	if (CurrentBuffer()->findMarks == Buffer::fmTemporary) {
 		RemoveFindMarks();
@@ -3647,50 +3745,50 @@ void SciTEBase::FoldChanged(SA::Line line, SA::FoldLevel levelNow, SA::FoldLevel
 	if (LevelIsHeader(levelNow)) {
 		if (!(LevelIsHeader(levelPrev))) {
 			// Adding a fold point.
-			wEditor.SetFoldExpanded(line, true);
-			if (!wEditor.AllLinesVisible())
+			PaneFocused().SetFoldExpanded(line, true);
+			if (!PaneFocused().AllLinesVisible())
 				ExpandFolds(line, true, levelPrev);
 		}
 	} else if (LevelIsHeader(levelPrev)) {
 		const SA::Line prevLine = line - 1;
-		const SA::FoldLevel levelPrevLine = wEditor.FoldLevel(prevLine);
+		const SA::FoldLevel levelPrevLine = PaneFocused().FoldLevel(prevLine);
 
 		// Combining two blocks where the first block is collapsed (e.g. by deleting the line(s) which separate(s) the two blocks)
-		if ((LevelNumberPart(levelPrevLine) == LevelNumberPart(levelNow)) && !wEditor.LineVisible(prevLine)) {
-			const SA::Line parentLine = wEditor.FoldParent(prevLine);
-			const SA::FoldLevel levelParentLine = wEditor.FoldLevel(parentLine);
-			wEditor.SetFoldExpanded(parentLine, true);
+		if ((LevelNumberPart(levelPrevLine) == LevelNumberPart(levelNow)) && !PaneFocused().LineVisible(prevLine)) {
+			const SA::Line parentLine = PaneFocused().FoldParent(prevLine);
+			const SA::FoldLevel levelParentLine = PaneFocused().FoldLevel(parentLine);
+			PaneFocused().SetFoldExpanded(parentLine, true);
 			ExpandFolds(parentLine, true, levelParentLine);
 		}
 
-		if (!wEditor.FoldExpanded(line)) {
+		if (!PaneFocused().FoldExpanded(line)) {
 			// Removing the fold from one that has been contracted so should expand
 			// otherwise lines are left invisible with no way to make them visible
-			wEditor.SetFoldExpanded(line, true);
-			if (!wEditor.AllLinesVisible())
+			PaneFocused().SetFoldExpanded(line, true);
+			if (!PaneFocused().AllLinesVisible())
 				// Combining two blocks where the second one is collapsed (e.g. by adding characters in the line which separates the two blocks)
 				ExpandFolds(line, true, levelPrev);
 		}
 	}
 	if (!(LevelIsWhitespace(levelNow)) &&
 			(LevelNumberPart(levelPrev) > LevelNumberPart(levelNow))) {
-		if (!wEditor.AllLinesVisible()) {
+		if (!PaneFocused().AllLinesVisible()) {
 			// See if should still be hidden
-			const SA::Line parentLine = wEditor.FoldParent(line);
+			const SA::Line parentLine = PaneFocused().FoldParent(line);
 			if (parentLine < 0) {
-				wEditor.ShowLines(line, line);
-			} else if (wEditor.FoldExpanded(parentLine) && wEditor.LineVisible(parentLine)) {
-				wEditor.ShowLines(line, line);
+				PaneFocused().ShowLines(line, line);
+			} else if (PaneFocused().FoldExpanded(parentLine) && PaneFocused().LineVisible(parentLine)) {
+				PaneFocused().ShowLines(line, line);
 			}
 		}
 	}
 	// Combining two blocks where the first one is collapsed (e.g. by adding characters in the line which separates the two blocks)
 	if (!(LevelIsWhitespace(levelNow) && (LevelNumberPart(levelPrev) < LevelNumberPart(levelNow)))) {
-		if (!wEditor.AllLinesVisible()) {
-			const SA::Line parentLine = wEditor.FoldParent(line);
-			if (!wEditor.FoldExpanded(parentLine) && wEditor.LineVisible(line)) {
-				wEditor.SetFoldExpanded(parentLine, true);
-				const SA::FoldLevel levelParentLine = wEditor.FoldLevel(parentLine);
+		if (!PaneFocused().AllLinesVisible()) {
+			const SA::Line parentLine = PaneFocused().FoldParent(line);
+			if (!PaneFocused().FoldExpanded(parentLine) && PaneFocused().LineVisible(line)) {
+				PaneFocused().SetFoldExpanded(parentLine, true);
+				const SA::FoldLevel levelParentLine = PaneFocused().FoldLevel(parentLine);
 				ExpandFolds(parentLine, true, levelParentLine);
 			}
 		}
@@ -3700,49 +3798,49 @@ void SciTEBase::FoldChanged(SA::Line line, SA::FoldLevel levelNow, SA::FoldLevel
 void SciTEBase::ExpandFolds(SA::Line line, bool expand, SA::FoldLevel level) {
 	// Expand or contract line and all subordinates
 	// level is the fold level of line
-	const SA::Line lineMaxSubord = wEditor.LastChild(line, LevelNumberPart(level));
+	const SA::Line lineMaxSubord = PaneFocused().LastChild(line, LevelNumberPart(level));
 	line++;
-	wEditor.Call(expand ? SA::Message::ShowLines : SA::Message::HideLines, line, lineMaxSubord);
+	PaneFocused().Call(expand ? SA::Message::ShowLines : SA::Message::HideLines, line, lineMaxSubord);
 	while (line <= lineMaxSubord) {
-		const SA::FoldLevel levelLine = wEditor.FoldLevel(line);
+		const SA::FoldLevel levelLine = PaneFocused().FoldLevel(line);
 		if (LevelIsHeader(levelLine)) {
-			wEditor.SetFoldExpanded(line, expand);
+			PaneFocused().SetFoldExpanded(line, expand);
 		}
 		line++;
 	}
 }
 
 void SciTEBase::FoldAll() {
-	wEditor.ColouriseAll();
-	const SA::Line maxLine = wEditor.LineCount();
+	PaneFocused().ColouriseAll();
+	const SA::Line maxLine = PaneFocused().LineCount();
 	bool expanding = true;
 	for (SA::Line lineSeek = 0; lineSeek < maxLine; lineSeek++) {
-		if (LevelIsHeader(wEditor.FoldLevel(lineSeek))) {
-			expanding = !wEditor.FoldExpanded(lineSeek);
+		if (LevelIsHeader(PaneFocused().FoldLevel(lineSeek))) {
+			expanding = !PaneFocused().FoldExpanded(lineSeek);
 			break;
 		}
 	}
 	for (SA::Line line = 0; line < maxLine; line++) {
-		const SA::FoldLevel level = wEditor.FoldLevel(line);
+		const SA::FoldLevel level = PaneFocused().FoldLevel(line);
 		if (LevelIsHeader(level) &&
 				(SA::FoldLevel::Base == LevelNumberPart(level))) {
-			const SA::Line lineMaxSubord = wEditor.LastChild(line, static_cast<SA::FoldLevel>(-1));
+			const SA::Line lineMaxSubord = PaneFocused().LastChild(line, static_cast<SA::FoldLevel>(-1));
 			if (expanding) {
-				wEditor.SetFoldExpanded(line, true);
+				PaneFocused().SetFoldExpanded(line, true);
 				ExpandFolds(line, true, level);
 				line = lineMaxSubord;
 			} else {
-				wEditor.SetFoldExpanded(line, false);
+				PaneFocused().SetFoldExpanded(line, false);
 				if (lineMaxSubord > line)
-					wEditor.HideLines(line + 1, lineMaxSubord);
+					PaneFocused().HideLines(line + 1, lineMaxSubord);
 			}
 		}
 	}
 }
 
 void SciTEBase::GotoLineEnsureVisible(SA::Line line) {
-	wEditor.EnsureVisibleEnforcePolicy(line);
-	wEditor.GotoLine(line);
+	PaneFocused().EnsureVisibleEnforcePolicy(line);
+	PaneFocused().GotoLine(line);
 }
 
 void SciTEBase::EnsureRangeVisible(GUI::ScintillaWindow &win, SA::Range range, bool enforcePolicy) {
@@ -3754,12 +3852,12 @@ void SciTEBase::EnsureRangeVisible(GUI::ScintillaWindow &win, SA::Range range, b
 }
 
 bool SciTEBase::MarginClick(SA::Position position, int modifiers) {
-	const SA::Line lineClick = wEditor.LineFromPosition(position);
+	const SA::Line lineClick = PaneFocused().LineFromPosition(position);
 	const SA::KeyMod km = static_cast<SA::KeyMod>(modifiers);
 	if (((km & SA::KeyMod::Shift) == SA::KeyMod::Shift) && ((km & SA::KeyMod::Ctrl) == SA::KeyMod::Ctrl)) {
 		FoldAll();
 	} else {
-		const SA::FoldLevel levelClick = wEditor.FoldLevel(lineClick);
+		const SA::FoldLevel levelClick = PaneFocused().FoldLevel(lineClick);
 		if (LevelIsHeader(levelClick)) {
 			if ((km & SA::KeyMod::Shift) == SA::KeyMod::Shift) {
 				EnsureAllChildrenVisible(lineClick, levelClick);
@@ -3767,7 +3865,7 @@ bool SciTEBase::MarginClick(SA::Position position, int modifiers) {
 				ToggleFoldRecursive(lineClick, levelClick);
 			} else {
 				// Toggle this line
-				wEditor.ToggleFold(lineClick);
+				PaneFocused().ToggleFold(lineClick);
 			}
 		}
 	}
@@ -3775,22 +3873,22 @@ bool SciTEBase::MarginClick(SA::Position position, int modifiers) {
 }
 
 void SciTEBase::ToggleFoldRecursive(SA::Line line, SA::FoldLevel level) {
-	if (wEditor.FoldExpanded(line)) {
+	if (PaneFocused().FoldExpanded(line)) {
 		// This ensure fold structure created before the fold is expanded
-		wEditor.LastChild(line, LevelNumberPart(level));
+		PaneFocused().LastChild(line, LevelNumberPart(level));
 		// Contract this line and all children
-		wEditor.SetFoldExpanded(line, false);
+		PaneFocused().SetFoldExpanded(line, false);
 		ExpandFolds(line, false, level);
 	} else {
 		// Expand this line and all children
-		wEditor.SetFoldExpanded(line, true);
+		PaneFocused().SetFoldExpanded(line, true);
 		ExpandFolds(line, true, level);
 	}
 }
 
 void SciTEBase::EnsureAllChildrenVisible(SA::Line line, SA::FoldLevel level) {
 	// Ensure all children visible
-	wEditor.SetFoldExpanded(line, true);
+	PaneFocused().SetFoldExpanded(line, true);
 	ExpandFolds(line, true, level);
 }
 

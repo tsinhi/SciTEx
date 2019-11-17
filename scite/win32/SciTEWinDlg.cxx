@@ -959,11 +959,19 @@ BOOL SciTEWin::FindMessage(HWND hDlg, UINT message, WPARAM wParam) {
 			::EndDialog(hDlg, IDCANCEL);
 			wFindReplace.Destroy();
 			return FALSE;
-		} else if ((ControlIDOfWParam(wParam) == IDOK) ||
-				(ControlIDOfWParam(wParam) == IDMARKALL)) {
+		} else if ((ControlIDOfWParam(wParam) == IDOK)  ||
+				(ControlIDOfWParam(wParam) == IDMARKALL) ||
+			(ControlIDOfWParam(wParam) == IDFINDCURRENTBUFFER) ||
+			(ControlIDOfWParam(wParam) == IDFINDALLBUFFERS) ) {
 			dlg.GrabFields();
 			if (ControlIDOfWParam(wParam) == IDMARKALL) {
 				MarkAll(markWithBookMarks);
+			}
+			if (ControlIDOfWParam(wParam) == IDFINDCURRENTBUFFER) {
+				FindCurrentBuffer();
+			}
+			if (ControlIDOfWParam(wParam) == IDFINDALLBUFFERS) {
+				FindAllBuffers();
 			}
 			// Holding the Shift key inverts the current reverse flag
 			const bool found = FindNext(reverseFind != IsKeyDown(VK_SHIFT)) >= 0;

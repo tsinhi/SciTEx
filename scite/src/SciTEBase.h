@@ -96,6 +96,7 @@ class Buffer {
 public:
 	RecentFile file;
 	void *doc;
+	int  id;
 	bool isRestoredFromSession;
 	bool isDirty;
 	bool isReadOnly;
@@ -136,6 +137,7 @@ public:
 		bookmarks.clear();
 		pFileWorker = nullptr;
 		futureDo = fdNone;
+		isRestoredFromSession = false;
 	}
 
 	void SetTimeFromFile() {
@@ -553,6 +555,7 @@ protected:
 
 	enum { bufferMax = IDM_IMPORT - IDM_BUFFER };
 	BufferList buffers;
+	std::vector<GUI::gui_string> toBeOpenFiles;
 
 	// Handle buffers
 	void *GetDocumentAt(int index);
@@ -762,6 +765,9 @@ protected:
 	intptr_t DoReplaceAll(bool inSelection); // returns number of replacements or negative value if error
 	intptr_t ReplaceAll(bool inSelection) override;
 	intptr_t ReplaceInBuffers();
+	intptr_t FindAllBuffers();
+	intptr_t FindCurrentBuffer();
+
 	void SetFindInFilesOptions();
 	void UIClosed() override;
 	void UIHasFocus() override;

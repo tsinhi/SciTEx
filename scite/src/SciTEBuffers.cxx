@@ -758,7 +758,7 @@ void SciTEBase::SaveSessionFile(const GUI::gui_char *sessionName) {
 		const int curr = buffers.Current();
 		for (int i = 0; i < buffers.lengthVisible; i++) {
 			const Buffer &buff = buffers.buffers[i];
-			if (buff.file.IsSet() && !buff.file.IsUntitled()) {
+			if (buff.file.IsSet() ) {
 				std::string propKey = IndexPropKey("buffer", i, "path");
 				fprintf(sessionFile, "\n%s=%s\n", propKey.c_str(), buff.file.AsUTF8().c_str());
 
