@@ -849,10 +849,11 @@ SciTEBase::SaveResult SciTEBase::SaveIfUnsure(bool forceQuestion, SaveFlags sf) 
 		else
 			return saveCompleted;
 	}
-	if ((CurrentBuffer()->isDirty) && (LengthDocument() || !filePath.IsUntitled() || forceQuestion)) {
-		if (props.GetInt("are.you.sure", 1) ||
+	if (((CurrentBuffer()->isDirty) && (LengthDocument() || forceQuestion) )
+		|| (filePath.IsUntitled() && LengthDocument() )   ) {
+		if ((props.GetInt("are.you.sure", 1) ||
 				filePath.IsUntitled() ||
-				forceQuestion) {
+				forceQuestion ) && !quitting_program) {
 			GUI::gui_string msg;
 			if (!filePath.IsUntitled()) {
 				msg = LocaliseMessage("Save changes to '^0'?", filePath.AsInternal());
@@ -1218,6 +1219,27 @@ bool SciTEBase::Save(SaveFlags sf) {
 		}
 		return true;
 	} else {
+		if (quitting_program) {
+
+			GUI::gui_string msg;
+			if (CurrentBuffer()->pFileWorker) {
+				msg = LocaliseMessage(
+					"The file '^0' is already being saved.",
+					filePath.AsInternal());
+				WindowMessageBox(wSciTE, msg);
+				// It is OK to not save this file
+				return true;
+			}
+
+			GUI::gui_string untitled_save_name(GUI_TEXT("buffer_untitled_"));
+			untitled_save_name += std::to_wstring(buffers.Current());
+			FilePath userFilePath = UserFilePath(untitled_save_name.c_str());
+			SaveBuffer(userFilePath, sf);
+			return true;
+
+		}
+
+
 		if (props.GetString("save.path.suggestion").length()) {
 			const time_t t = time(nullptr);
 			char timeBuff[15];

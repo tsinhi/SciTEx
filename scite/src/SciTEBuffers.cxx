@@ -758,10 +758,20 @@ void SciTEBase::SaveSessionFile(const GUI::gui_char *sessionName) {
 		const int curr = buffers.Current();
 		for (int i = 0; i < buffers.lengthVisible; i++) {
 			const Buffer &buff = buffers.buffers[i];
-			if (buff.file.IsSet() ) {
+			if (buff.file.IsSet() || buff.file.IsUntitled()) {
+				std::string UntitledPath = sessionPathName.Directory().AsUTF8() + "\\buffer_untitled_" + StdStringFromInteger(i);
+				
 				std::string propKey = IndexPropKey("buffer", i, "path");
-				fprintf(sessionFile, "\n%s=%s\n", propKey.c_str(), buff.file.AsUTF8().c_str());
-
+				if (buff.file.IsUntitled()) {
+					if (wEditor.Length() == 0) {
+						break;
+					}
+					fprintf(sessionFile, "\n%s=%s\n", propKey.c_str(), UntitledPath.c_str());
+				}
+				else {
+					fprintf(sessionFile, "\n%s=%s\n", propKey.c_str(), buff.file.AsUTF8().c_str());
+				}
+	
 				const SA::Position pos = buff.file.selection.position + 1;
 				const std::string sPos = std::to_string(pos);
 				propKey = IndexPropKey("buffer", i, "position");
@@ -1266,10 +1276,8 @@ bool SciTEBase::AddFileToBuffer(const BufferState &bufferState) {
 				}
 			}
 
-			if (bufferState.file.AsUTF8().find("BUFFER_UNTITLED") != std::string::npos) {
-				//buffers.buffers[iBuffer].file.Set(FilePath());
+			if (bufferState.file.AsUTF8().find("buffer_untitled_") != std::string::npos) {
 				filePath.Set(FilePath());
-				//UpdateBuffersCurrent();
 				buffers.buffers[iBuffer].isRestoredFromSession = true; 
 			}
 		}
@@ -1984,6 +1992,35 @@ void SciTEBase::GoMessage(int dir) {
 			SA::Position column;
 			SA::Line sourceLine = DecodeMessage(message.c_str(), source, style, column);
 			if (sourceLine >= 0) {
+				if (!source.empty()) {
+					source.erase(0, source.find_first_not_of(" "));
+					source.erase(source.find_last_not_of(" ") + 1);
+				}
+
+				if (source == "LINE") {
+					SA::Line foldParentLine = wOutput.FoldParent(curLine);
+					SA::Position lineLen = wOutput.LineLength(foldParentLine);
+					std::vector<char> text(lineLen + 1);
+					text[lineLen] = '\0';
+
+					wOutput.GetLine(foldParentLine, text.data());
+					source = text.data();
+
+					if (!source.empty()) {
+						source.erase(0, source.find_first_not_of(" "));
+						source.erase(source.find_last_not_of(" ") + 1);
+					}
+
+					RemoveStringOnce(source, "\n");
+
+					if (source.find("BUFFER ID:") != std::string::npos) {
+						RemoveStringOnce(source, "BUFFER ID:");
+						SetDocumentAt(IntegerFromText(source.c_str())-1);
+						source.clear();
+					}
+				}
+
+
 				GUI::gui_string sourceString = GUI::StringFromUTF8(source);
 				FilePath sourcePath = FilePath(sourceString).NormalizePath();
 				if (!filePath.Name().SameNameAs(sourcePath)) {

@@ -385,7 +385,8 @@ protected:
 	enum { indicatorMatch = static_cast<int>(SA::IndicatorStyle::Container),
 	       indicatorHighlightCurrentWord,
 	       indicatorSpellingMistake,
-	       indicatorSentinel
+	       indicatorSentinel,
+		   indicatorFindForOutput
 	     };
 	enum { markerBookmark = 1 };
 	ComboMemory memFiles;
@@ -469,6 +470,7 @@ protected:
 	Extension *extender;
 	bool needReadProperties;
 	bool quitting;
+	bool quitting_program;
 
 	int timerMask;
 	enum { timerAutoSave=1 };
@@ -726,6 +728,7 @@ protected:
 	enum AddSelection { addNext, addEach };
 	void SelectionAdd(AddSelection add);
 	virtual std::string EncodeString(const std::string &s);
+	virtual std::string DecodeString(const std::string& s);
 	virtual void Find() = 0;
 	enum MessageBoxChoice {
 		mbOK,
@@ -755,7 +758,7 @@ protected:
 	void SetCaretAsStart() override;
 	void MoveBack() override;
 	void ScrollEditorIfNeeded() override;
-	SA::Position FindNext(bool reverseDirection, bool showWarnings=true, bool allowRegExp=true) override;
+	SA::Position FindNext(bool reverseDirection, bool showWarnings=false, bool allowRegExp=true) override;
 	void HideMatch() override;
 	virtual void FindIncrement() = 0;
 	int IncrementSearchMode();
@@ -765,6 +768,7 @@ protected:
 	intptr_t DoReplaceAll(bool inSelection); // returns number of replacements or negative value if error
 	intptr_t ReplaceAll(bool inSelection) override;
 	intptr_t ReplaceInBuffers();
+	intptr_t OutputFindList();
 	intptr_t FindAllBuffers();
 	intptr_t FindCurrentBuffer();
 
@@ -990,8 +994,10 @@ protected:
 
 	CurrentWordHighlight currentWordHighlight;
 	void HighlightCurrentWord(bool highlight);
+	void HighlightFindResultForOutputPanel(std::string sWordToFind, SA::Range highlightRange, SA::FindOption searchFlags);
 	MatchMarker matchMarker;
 	MatchMarker findMarker;
+	MatchMarker outputFindMarker;
 public:
 
 	enum { maxParam = 4 };

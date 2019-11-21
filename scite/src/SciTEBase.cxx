@@ -201,6 +201,7 @@ SciTEBase::SciTEBase(Extension *ext) : apis(true), pwFocussed(&wEditor), extende
 
 	needReadProperties = false;
 	quitting = false;
+	quitting_program = false;
 
 	timerMask = 0;
 	delayBeforeAutoSave = 0;
@@ -716,6 +717,22 @@ bool SciTEBase::islexerwordcharforsel(char ch) {
 		return iswordcharforsel(ch);
 }
 
+void SciTEBase::HighlightFindResultForOutputPanel(std::string sWordToFind,SA::Range highlightRange, SA::FindOption searchFlags) {
+
+	wOutput.SetIndicatorCurrent(indicatorFindForOutput);
+	
+	SA::Range sel = highlightRange;
+
+	if (sWordToFind.length() == 0 || (sWordToFind.find_first_of("\n\r ") != std::string::npos))
+		return; // No highlight when no selection or multi-lines selection.
+
+	outputFindMarker.StartMatch(&wOutput, sWordToFind,
+		searchFlags, -1,
+		indicatorFindForOutput, -1);
+	SetIdler(true);
+}
+
+
 void SciTEBase::HighlightCurrentWord(bool highlight) {
 	if (!currentWordHighlight.isEnabled)
 		return;
@@ -746,7 +763,7 @@ void SciTEBase::HighlightCurrentWord(bool highlight) {
 	}
 	// Get style of the current word to highlight only word with same style.
 	int selectedStyle = wCurrent.UnsignedStyleAt(sel.start);
-	if (!currentWordHighlight.isOnlyWithSameStyle)
+	if (!currentWordHighlight.isOnlyWithSameStyle || wOutput.HasFocus())
 		selectedStyle = -1;
 
 	// Manage word with DBCS.
@@ -889,6 +906,10 @@ void SciTEBase::SelectionAdd(AddSelection add) {
 }
 
 std::string SciTEBase::EncodeString(const std::string &s) {
+	return s;
+}
+
+std::string SciTEBase::DecodeString(const std::string& s) {
 	return s;
 }
 
@@ -1262,80 +1283,60 @@ intptr_t SciTEBase::ReplaceInBuffers() {
 }
 
 
-intptr_t SciTEBase::FindAllBuffers() {
-	
-	// find all buffers
-	const int currentBuffer = buffers.Current();
-	intptr_t replacements = 0;
-	for (int i = 0; i < buffers.length; i++) {
-		SetDocumentAt(i);
-		replacements += DoReplaceAll(false);
-		if (i == 0 && replacements < 0) {
-			FindMessageBox(
-				"Find string must not be empty for 'Replace in Buffers' command.");
-			break;
-		}
-	}
-	SetDocumentAt(currentBuffer);
-	
-	OutputAppendString("find all buffers\n");
-	SetOutputVisibility(true);
-	return 0;
-}
-
-
-
-intptr_t SciTEBase::FindCurrentBuffer() {
-		
+intptr_t SciTEBase::OutputFindList()
+{
 	if (findWhat.length() == 0) {
-		Find();
 		return -1;
 	}
-
-	
-	
 
 	const std::string findTarget = UnSlashAsNeeded(EncodeString(findWhat), unSlash, regExp);
 	if (findTarget.length() == 0) {
 		return -1;
 	}
 
-	OutputAppendString("search for ....\n");
-	OutputAppendString("  File: Untitled 0\n");
-	OutputAppendString("    LINE:2:1: finded 0\n");
-
-	FilePath currentPath = CurrentBuffer()->file.BaseName();
-	Buffer *buff =  CurrentBuffer();
-	
-	
-
-#if 0
-
-	SA::Range rangeSearch = wEditor.SelectionRange();
+	SA::Range rangeSearch(SA::Position(0));
 	rangeSearch.start = 0;
 	rangeSearch.end = LengthDocument();
 	wEditor.SetSearchFlags(SearchFlags(regExp));
 	SA::Position posFind = FindInTarget(findTarget, rangeSearch);
-	if ((posFind >= 0) && (posFind <= rangeSearch.end)) {
+	if (posFind >= 0 && posFind <= rangeSearch.end) {
 		SA::Position lastMatch = posFind;
 		intptr_t findnum = 0;
-		std::string os(":");
+		std::string os("");
+		
+		if (CurrentBuffer()->file.IsUntitled()) {
+			os.append("  BUFFER ID:");
+			os.append((StdStringFromInteger(buffers.Current()+1)));
+		}
+		else {
+			os.append("  ");
+			os.append(EncodeString(CurrentBuffer()->file.AsUTF8()));
+		}
+		os.append("\n");
 
-		// find loop
 		while (posFind >= 0) {
-			
 			findnum++;
 			Scintilla::API::Line findLine = wEditor.LineFromPosition(posFind);
-			os.append(StdStringFromInteger(findLine));
-			os.append(":1: finded");
-			os.append("\n");
+			int columnPos = wEditor.Column(posFind);
+			SA::Position lineLen = wEditor.LineLength(findLine);
+			std::vector<char> text(lineLen + 1);
+			text[lineLen] = '\0';
+			wEditor.GetLine(findLine, text.data());
+			os.append("    LINE:");
+
+			os.append(StdStringFromInteger(findLine+1));
+			os.append(":");
+			os.append(StdStringFromInteger(columnPos+1));
+			os.append(" ");
+			os.append(text.data());
+
 			OutputAppendString(os.c_str());
 			os.clear();
 
 
 			const SA::Position lenTarget = wEditor.TargetEnd() - wEditor.TargetStart();
-			lastMatch = posFind+1;
-			
+			lastMatch = posFind + 1;
+
 			if (lenTarget <= 0) {
 				lastMatch = wEditor.PositionAfter(lastMatch);
 			}
@@ -1346,16 +1347,67 @@ intptr_t SciTEBase::FindCurrentBuffer() {
 			else {
 				posFind = FindInTarget(findTarget, SA::Range(lastMatch, rangeSearch.end));
 			}
-		
+
 		}
-		
+	}
+
+
+
+
+}
+
+
+intptr_t SciTEBase::FindAllBuffers() {
+	
+	const std::string findTarget = UnSlashAsNeeded(EncodeString(findWhat), unSlash, regExp);
+	if (findTarget.length() == 0) {
+		return -1;
+	}
+	SA::Position outputStartPos = wOutput.Length();
+	OutputAppendString("Find String In All Buffers:");
+	OutputAppendString(findTarget.c_str());
+	OutputAppendString("\n");
+
+	const int currentBuffer = buffers.Current();
+	intptr_t replacements = 0;
+	for (int i = 0; i < buffers.length; i++) {
+		buffers.SetCurrent(i);
+		wEditor.SetDocPointer(GetDocumentAt(buffers.Current()));
+		OutputFindList();
+		OutputAppendString("\n");
 
 	}
+	buffers.SetCurrent(currentBuffer);
+	wEditor.SetDocPointer(GetDocumentAt(buffers.Current()));
+	OutputAppendString("\n");
 	
-#endif
+	wOutput.GotoPos(outputStartPos);
 
 	SetOutputVisibility(true);
-	//SetDocumentAt(1);
+	return 0;
+}
+
+
+
+intptr_t SciTEBase::FindCurrentBuffer() {
+		
+	const std::string findTarget = UnSlashAsNeeded(EncodeString(findWhat), unSlash, regExp);
+	if (findTarget.length() == 0) {
+		return -1;
+	}
+
+	SA::Position outputStartPos = wOutput.Length();
+	OutputAppendString("Find string in current Buffer:");
+	OutputAppendString(findTarget.c_str());
+	OutputAppendString("\n");
+
+	OutputFindList();
+	OutputAppendString("\n");
+
+	wOutput.GotoPos(outputStartPos);
+	SetOutputVisibility(true);
+
+	
 	return 0;
 }
 
@@ -1447,7 +1499,7 @@ void SciTEBase::SetOutputVisibility(bool show) {
 				if (splitVertical)
 					heightOutput = NormaliseSplit(300);
 				else
-					heightOutput = NormaliseSplit(100);
+					heightOutput = NormaliseSplit(200);
 				previousHeightOutput = heightOutput;
 			} else {
 				heightOutput = NormaliseSplit(previousHeightOutput);
@@ -4323,6 +4375,11 @@ void SciTEBase::OnIdle() {
 		matchMarker.Continue();
 		return;
 	}
+	if (!outputFindMarker.Complete()) {
+		outputFindMarker.Continue();
+		return;
+	}
+
 	SetIdler(false);
 }
 
